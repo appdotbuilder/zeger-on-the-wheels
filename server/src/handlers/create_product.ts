@@ -1,20 +1,32 @@
 
+import { db } from '../db';
+import { productsTable } from '../db/schema';
 import { type CreateProductInput, type Product } from '../schema';
 
 export const createProduct = async (input: CreateProductInput): Promise<Product> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a new product/menu item for a store.
-    // Should validate that the user has permission to add products to this store.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+  try {
+    // Insert product record
+    const result = await db.insert(productsTable)
+      .values({
         store_id: input.store_id,
         name: input.name,
         description: input.description,
-        price: input.price,
+        price: input.price.toString(), // Convert number to string for numeric column
         category: input.category,
         image_url: input.image_url,
-        is_available: true,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Product);
+        is_available: true // Default value
+      })
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const product = result[0];
+    return {
+      ...product,
+      price: parseFloat(product.price) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Product creation failed:', error);
+    throw error;
+  }
 };

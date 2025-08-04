@@ -1,23 +1,57 @@
 
+import { db } from '../db';
+import { stockVerificationTable, usersTable, storesTable } from '../db/schema';
 import { type CreateStockVerificationInput, type StockVerification } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export const createStockVerification = async (input: CreateStockVerificationInput): Promise<StockVerification> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a stock verification entry.
-    // Used for start-of-day, end-of-day, and restock verifications.
-    // Should handle photo uploads and stock data validation.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+  try {
+    // Verify that the rider exists and has rider_seller role
+    const rider = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.id, input.rider_id))
+      .execute();
+
+    if (rider.length === 0) {
+      throw new Error('Rider not found');
+    }
+
+    if (rider[0].role !== 'rider_seller') {
+      throw new Error('User is not a rider');
+    }
+
+    // Verify that the store exists
+    const store = await db.select()
+      .from(storesTable)
+      .where(eq(storesTable.id, input.store_id))
+      .execute();
+
+    if (store.length === 0) {
+      throw new Error('Store not found');
+    }
+
+    // Insert stock verification record
+    const result = await db.insert(stockVerificationTable)
+      .values({
         rider_id: input.rider_id,
         store_id: input.store_id,
         verification_type: input.verification_type,
         stock_data: input.stock_data,
         photo_urls: input.photo_urls,
         cash_deposit_photo: input.cash_deposit_photo,
-        status: 'pending',
-        verified_by: null,
         notes: input.notes,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as StockVerification);
+        status: 'pending' // Default status
+      })
+      .returning()
+      .execute();
+
+    const stockVerification = result[0];
+    return {
+      ...stockVerification,
+      // All other fields are already correct types (no numeric conversions needed)
+    };
+  } catch (error) {
+    console.error('Stock verification creation failed:', error);
+    throw error;
+  }
 };
